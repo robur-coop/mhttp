@@ -1,4 +1,17 @@
 (library
+ (name mhttp_server)
+ (modules mhttp_server)
+ (public_name mhttp-server)
+ (libraries mhttp httpcats.runtime))
+
+(library
+ (name mhttp_client)
+ (modules mhttp_client)
+ (public_name mhttp-client)
+ (libraries mnet-happy-eyeballs ca-certs-nss mirage-ptime.solo5 mhttp httpcats.core httpcats.runtime))
+
+(library
  (name mhttp)
+ (modules mhttp)
  (public_name mhttp)
- (libraries h1 h2 mkernel mnet httpcats.runtime))
+ (libraries h1 h2 mkernel mnet mnet-tls httpcats.runtime))

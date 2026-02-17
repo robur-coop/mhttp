@@ -23,7 +23,7 @@ val switch : stop -> unit
     call registered (by the HTTP server) finalizers and terminates. If the given
     switch is already off, it does nothing. *)
 
-type flow = [ `Tcp of Mnet.TCPv4.flow ]
+type flow = [ `Tcp of Mnet.TCP.flow ]
 (** The type of connection used to communicate with the client. *)
 
 type request = {
@@ -49,9 +49,9 @@ val clear :
   -> ?config:H1.Config.t
   -> ?ready:unit Miou.Computation.t
   -> ?error_handler:error_handler
-  -> ?upgrade:(Mnet.TCPv4.flow -> unit)
+  -> ?upgrade:(Mnet.TCP.flow -> unit)
   -> handler:handler
-  -> Mnet.TCPv4.state
+  -> Mnet.TCP.state
   -> port:int
   -> unit
 
