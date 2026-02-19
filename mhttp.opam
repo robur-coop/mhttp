@@ -4,6 +4,7 @@ authors: ["Robur <team@robur.coop>"]
 homepage: "https://github.com/robur-coop/mhttp"
 dev-repo: "git+https://github.com/robur-coop/mhttp.git"
 bug-reports: "https://github.com/robur-coop/mhttp/issues"
+license: "MIT"
 
 depends: [
   "ocaml" {>= "5.0.0"}

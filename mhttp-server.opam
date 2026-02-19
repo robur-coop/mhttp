@@ -4,6 +4,7 @@ authors: ["Robur <team@robur.coop>"]
 homepage: "https://github.com/robur-coop/mhttp"
 dev-repo: "git+https://github.com/robur-coop/mhttp.git"
 bug-reports: "https://github.com/robur-coop/mhttp/issues"
+license: "MIT"
 
 depends: [
   "ocaml" {>= "5.0.0"}
@@ -17,4 +18,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 
-synopsis: "An implementation of HTTP in OCaml for unikernels"
+synopsis: "An implementation of an HTTP server in OCaml for unikernels"
