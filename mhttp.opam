@@ -4,13 +4,15 @@ authors: ["Robur <team@robur.coop>"]
 homepage: "https://github.com/robur-coop/mhttp"
 dev-repo: "git+https://github.com/robur-coop/mhttp.git"
 bug-reports: "https://github.com/robur-coop/mhttp/issues"
+license: "MIT"
 
 depends: [
   "ocaml" {>= "5.0.0"}
   "dune" {>= "2.7.0"}
   "mnet"
+  "mnet-tls"
   "mirage-crypto-rng"
-  "httpcats"
+  "httpcats" {>= "0.2.0"}
 ]
 build: [
   ["dune" "subst"] {dev}
