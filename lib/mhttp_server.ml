@@ -22,7 +22,11 @@ type error =
   | `V2 of H2.Server_connection.error
   | `Protocol of string ]
 
-type stop = Miou.Mutex.t * Miou.Condition.t * bool ref
+type stop = {
+    mutex: Miou.Mutex.t
+  ; condition: Miou.Condition.t
+  ; flag: bool Atomic.t
+}
 
 let pp_error ppf = function
   | `V1 `Bad_request -> Fmt.string ppf "Bad HTTP/1.1 request"
@@ -99,36 +103,44 @@ let rec clean_up orphans =
 
 exception Stop
 
-let rec wait ((m, c, v) as stop) () =
+let rec wait ({ mutex; condition; flag } as stop) () =
   let value =
-    Miou.Mutex.protect m @@ fun () ->
-    while not !v do
-      Miou.Condition.wait c m
+    Miou.Mutex.protect mutex @@ fun () ->
+    while Atomic.get flag = false do
+      Miou.Condition.wait condition mutex
     done;
-    !v
+    Atomic.get flag
   in
   if value then raise Stop else wait stop ()
 
-let stop () = (Miou.Mutex.create (), Miou.Condition.create (), ref false)
+let stop () =
+  let mutex = Miou.Mutex.create () in
+  let condition = Miou.Condition.create () in
+  let flag = Atomic.make false in
+  { mutex; condition; flag }
 
-let switch (m, c, v) =
-  Miou.Mutex.protect m @@ fun () ->
-  v := true;
-  Miou.Condition.broadcast c
+let switch { mutex; condition; flag } =
+  Miou.Mutex.protect mutex @@ fun () ->
+  Atomic.set flag true;
+  Miou.Condition.broadcast condition
 
 let accept_or_stop ?stop tcpv4 listen =
   match stop with
   | None -> Some (Mnet.TCP.accept tcpv4 listen)
-  | Some stop -> (
+  | Some s when Atomic.get s.flag -> None
+  | Some s -> begin
       let accept = Miou.async @@ fun () -> Mnet.TCP.accept tcpv4 listen in
-      let stop = Miou.async (wait stop) in
+      let stop = Miou.async (wait s) in
       match Miou.await_first [ accept; stop ] with
+      | Ok flow when Atomic.get s.flag -> Mnet.TCP.close flow; None
       | Ok flow -> Some flow
       | Error Stop -> None
+      | Error _exn when Atomic.get s.flag -> None
       | Error exn ->
           Log.err (fun m ->
               m "unexpected exception: %S" (Printexc.to_string exn));
-          raise exn)
+          raise exn
+    end
 
 let errf err =
   Fmt.str "<h1>500 Internal error</h1><p>Error: %a</p>" pp_error err
