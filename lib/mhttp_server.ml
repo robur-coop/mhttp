@@ -179,9 +179,9 @@ let default_error_handler version ?request:_ err respond =
 
 let clear ?stop ?(config = H1.Config.default) ?ready
     ?error_handler:(user's_error_handler = default_error_handler) ?upgrade
-    ~handler:user's_handler tcpv4 ~port =
+    ~handler:user's_handler tcp ~port =
   let rec go orphans listen =
-    match accept_or_stop ?stop tcpv4 listen with
+    match accept_or_stop ?stop tcp listen with
     | None ->
         Log.debug (fun m -> m "stop the server");
         (* TODO(dinosaure): unlisten? *)
@@ -195,6 +195,6 @@ let clear ?stop ?(config = H1.Config.default) ?ready
         in
         go orphans listen
   in
-  let listen = Mnet.TCP.listen tcpv4 port in
+  let listen = Mnet.TCP.listen tcp port in
   Option.iter (fun c -> ignore (Miou.Computation.try_return c ())) ready;
   go (Miou.orphans ()) listen
