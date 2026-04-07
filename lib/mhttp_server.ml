@@ -14,7 +14,7 @@ let inhibit fn v = try fn v with _exn -> ()
 module TCP_and_H1 = struct
   include TCP
 
-  let shutdown flow = function `read -> () | value -> shutdown flow value
+  let shutdown _flow _cmd = ()
 end
 
 module H2_Server_connection = struct
