@@ -8,7 +8,13 @@
  (name mhttp_client)
  (modules mhttp_client)
  (public_name mhttp-client)
- (libraries mnet-happy-eyeballs ca-certs-nss mirage-ptime.solo5 mhttp httpcats.core httpcats.runtime))
+ (libraries
+  mnet-happy-eyeballs
+  ca-certs-nss
+  mirage-ptime.solo5
+  mhttp
+  httpcats.core
+  httpcats.runtime))
 
 (library
  (name mhttp)
