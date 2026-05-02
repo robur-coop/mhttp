@@ -98,7 +98,8 @@ let http_1_1_server_connection ~config ~user's_error_handler ?upgrade
     in
     user's_error_handler `V1 ?request err respond
   in
-  let rec fn reqd = user's_handler (`Tcp flow) (`H1 (Lazy.force conn)) (`V1 reqd)
+  let rec fn reqd =
+    user's_handler (`Tcp flow) (`H1 (Lazy.force conn)) (`V1 reqd)
   and conn = lazy (H1.Server_connection.create ~config ~error_handler fn) in
   let conn = Lazy.force conn in
   let tags =
@@ -126,7 +127,8 @@ let https_1_1_server_connection ~config ~user's_error_handler ?upgrade
     in
     user's_error_handler `V1 ?request err respond
   in
-  let rec fn reqd = user's_handler (`Tls flow) (`H1 (Lazy.force conn)) (`V1 reqd)
+  let rec fn reqd =
+    user's_handler (`Tls flow) (`H1 (Lazy.force conn)) (`V1 reqd)
   and conn = lazy (H1.Server_connection.create ~config ~error_handler fn) in
   let conn = Lazy.force conn in
   let tags =
@@ -150,7 +152,8 @@ let h2s_server_connection ~config ~user's_error_handler ?upgrade ~user's_handler
     let respond hdrs = `V2 (respond hdrs) in
     user's_error_handler `V2 ?request err respond
   in
-  let rec fn reqd = user's_handler (`Tls flow) (`H2 (Lazy.force conn)) (`V2 reqd)
+  let rec fn reqd =
+    user's_handler (`Tls flow) (`H2 (Lazy.force conn)) (`V2 reqd)
   and conn = lazy (H2.Server_connection.create ~config ~error_handler fn) in
   let conn = Lazy.force conn in
   let tags =
@@ -168,14 +171,14 @@ let h2s_server_connection ~config ~user's_error_handler ?upgrade ~user's_handler
 let rec clean_up orphans =
   match Miou.care orphans with
   | None | Some None -> ()
-  | Some (Some prm) -> begin
-      match Miou.await prm with
+  | Some (Some prm) ->
+      begin match Miou.await prm with
       | Ok () -> clean_up orphans
       | Error exn ->
           Log.err (fun m ->
               m "unexpected exception: %s" (Printexc.to_string exn));
           clean_up orphans
-    end
+      end
 
 exception Stop
 
