@@ -12,7 +12,7 @@ depends: [
   "mnet"
   "mnet-tls"
   "mirage-crypto-rng"
-  "httpcats" {>= "0.2.0"}
+  "httpcats" {>= "0.3.0"}
 ]
 build: [
   ["dune" "subst"] {dev}
@@ -21,8 +21,3 @@ build: [
 ]
 
 synopsis: "An implementation of HTTP in OCaml for unikernels"
-
-pin-depends: [
-  [ "httpcats.dev" "git+https://github.com/robur-coop/httpcats.git#6b19476a1fa95cdee34150ba8e4f5636d343b908" ]
-  [ "miou.dev" "git+https://github.com/robur-coop/miou.git#4e8fd306c305142035f65a1339ca1aa9f011c955" ]
-]
