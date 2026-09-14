@@ -72,4 +72,24 @@ val with_tls :
   -> port:int
   -> unit
 
-val peer : secure:bool -> (Ipaddr.t * int) Logs.Tag.def
+val peer : scheme:string -> (Ipaddr.t * int) Logs.Tag.def
+
+module Websocket : sig
+  type elt =
+    [ `Connection_close
+    | `Msg of H1.Websocket.Opcode.standard_non_control * bool
+    | `Other
+    | `Ping
+    | `Pong ]
+    * string
+
+  type ic = unit -> elt option
+  and oc = elt -> unit
+  and stop
+
+  val stop : unit -> stop
+  val switch : stop -> unit
+
+  val upgrade :
+    ?tags:Logs.Tag.set -> ?stop:stop -> fn:(ic -> oc -> unit) -> flow -> unit
+end

@@ -2,7 +2,7 @@
  (name mhttp_server)
  (modules mhttp_server)
  (public_name mhttp-server)
- (libraries mhttp httpcats.runtime))
+ (libraries flux mhttp httpcats.runtime))
 
 (library
  (name mhttp_client)
