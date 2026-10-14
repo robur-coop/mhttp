@@ -1,14 +1,14 @@
 open Mhttp
 
-let peer ~secure =
-  let scheme = if secure then "https" else "http" in
+let peer ~scheme =
   let pp ppf (ipaddr, port) =
     Fmt.pf ppf "%s%a:%d" scheme Ipaddr.pp ipaddr port
   in
-  Logs.Tag.def ~doc:"HTTP (unikernel) peer" "mhttp.peer" pp
+  Logs.Tag.def "mhttp.peer" pp
 
-let clear_peer = peer ~secure:false
-let secure_peer = peer ~secure:true
+let clear_peer = peer ~scheme:"http"
+let secure_peer = peer ~scheme:"https"
+let websocket_peer = peer ~scheme:"ws"
 let inhibit fn v = try fn v with _exn -> ()
 
 module TCP_and_H1 = struct
@@ -31,9 +31,170 @@ module H2_Server_connection = struct
          | `Upgrade ])
 end
 
+module Websocket_connection = struct
+  include H1.Websocket.Server_connection
+
+  let next_read_operation t =
+    (next_read_operation t :> [ `Read | `Close | `Upgrade | `Yield ])
+
+  let next_write_operation t =
+    (next_write_operation t
+      :> [ `Write of Bstr.t Faraday.iovec list
+         | `Close of int
+         | `Yield
+         | `Upgrade ])
+
+  let yield_reader _t _k = assert false
+
+  let report_exn _t exn =
+    Log.err (fun m -> m "websocket runtime: %s" (Printexc.to_string exn));
+    raise exn
+end
+
 module A = Runtime.Make (TLS) (H1.Server_connection)
 module B = Runtime.Make (TCP_and_H1) (H1.Server_connection)
 module C = Runtime.Make (TLS) (H2_Server_connection)
+module D = Runtime.Make (TCP_and_H1) (Websocket_connection)
+module E = Runtime.Make (TLS) (Websocket_connection)
+
+module Wsstop = struct
+  type t = {
+      lock: Miou.Mutex.t
+    ; cond: Miou.Condition.t
+    ; mutable received: bool
+    ; mutable emitted: bool
+    ; mutable eof: bool
+  }
+
+  let create () =
+    {
+      lock= Miou.Mutex.create ()
+    ; cond= Miou.Condition.create ()
+    ; received= false
+    ; emitted= false
+    ; eof= false
+    }
+
+  let set_received t =
+    Miou.Mutex.protect t.lock @@ fun () ->
+    t.received <- true;
+    Miou.Condition.signal t.cond
+
+  let set_emitted t =
+    Miou.Mutex.protect t.lock @@ fun () ->
+    t.emitted <- true;
+    Miou.Condition.signal t.cond
+
+  let set_eof t =
+    Miou.Mutex.protect t.lock @@ fun () ->
+    t.eof <- true;
+    Miou.Condition.signal t.cond
+
+  let on_close t fn =
+    Miou.Mutex.protect t.lock @@ fun () ->
+    while not ((t.received && t.emitted) || t.eof) do
+      Miou.Condition.wait t.cond t.lock
+    done;
+    fn t.received t.emitted
+end
+
+module Websocket = struct
+  open H1
+  open H1.Websocket
+
+  type elt =
+    [ `Connection_close
+    | `Msg of H1.Websocket.Opcode.standard_non_control * bool
+    | `Other
+    | `Ping
+    | `Pong ]
+    * string
+
+  type ic = unit -> elt option
+  type oc = elt -> unit
+  type stop = Wsstop.t
+
+  let stop () = Wsstop.create ()
+  let switch stop = Wsstop.set_eof stop
+
+  let write_websocket oc stop wsd =
+    let rec go () =
+      match Flux.Bqueue.get oc with
+      | None -> ()
+      | Some (kind, data) ->
+          begin match kind with
+          | `Other -> failwith "Unsupported frame of kind `Other"
+          | `Connection_close ->
+              Wsd.close wsd; Flux.Bqueue.close oc; Wsstop.set_emitted stop; ()
+          | `Ping -> Wsd.send_ping wsd
+          | `Pong -> Wsd.send_pong wsd
+          | `Msg (kind, is_fin) ->
+              let len = String.length data in
+              Wsd.send_bytes wsd ~kind ~is_fin
+                (Bytes.unsafe_of_string data)
+                ~off:0 ~len;
+              ()
+          end;
+          go ()
+    in
+    go
+
+  let websocket_handler ic ivar stop wsd =
+    ignore (Miou.Computation.try_return ivar wsd);
+    let frame_handler ~opcode ~is_fin bstr ~off ~len =
+      let data = Bstr.sub_string bstr ~off ~len in
+      match opcode with
+      | `Other _ -> Flux.Bqueue.put ic (`Other, data)
+      | `Connection_close ->
+          Flux.Bqueue.put ic (`Connection_close, data);
+          Wsstop.set_received stop;
+          Flux.Bqueue.close ic
+      | #Opcode.standard_control as kind -> Flux.Bqueue.put ic (kind, data)
+      | #Opcode.standard_non_control as kind ->
+          Flux.Bqueue.put ic (`Msg (kind, is_fin), data)
+    in
+    let eof () = Wsstop.set_eof stop in
+    { frame_handler; eof }
+
+  let upgrade ?(tags = Logs.Tag.empty) ?stop ~fn flow =
+    let ic = Flux.Bqueue.(create with_close_and_halt) 0x7ff in
+    let oc = Flux.Bqueue.(create with_close_and_halt) 0x7ff in
+    let ivar = Miou.Computation.create () in
+    let stop = match stop with Some stop -> stop | None -> Wsstop.create () in
+    let tags =
+      match flow with
+      | `Tcp flow ->
+          let peer, _ = Mnet.TCP.peers flow in
+          Logs.Tag.add websocket_peer peer tags
+      | `Tls flow ->
+          let flow = Mnet_tls.file_descr flow in
+          let peer, _ = Mnet.TCP.peers flow in
+          Logs.Tag.add websocket_peer peer tags
+    in
+    let websocket_handler = websocket_handler ic ivar stop in
+    let conn = Websocket.Server_connection.create ~websocket_handler in
+    let runtime's_prm =
+      match flow with
+      | `Tcp flow -> D.run conn ~tags flow
+      | `Tls flow -> E.run conn ~tags (TLS.make flow)
+    in
+    let wsd = Miou.Computation.await_exn ivar in
+    let writer = Miou.async (write_websocket oc stop wsd) in
+    let user's_handler =
+      Miou.async @@ fun () ->
+      let ic () = Flux.Bqueue.get ic and oc elt = Flux.Bqueue.put oc elt in
+      fn ic oc
+    in
+    let close =
+      Miou.async @@ fun () ->
+      Wsstop.on_close stop @@ fun received emitted ->
+      if not (received && emitted) then begin
+        Wsd.close wsd; Flux.Bqueue.halt ic; Flux.Bqueue.halt oc; ()
+      end
+    in
+    Miou.await_all [ runtime's_prm; user's_handler; writer; close ]
+    |> List.iter (function Ok () -> () | Error exn -> raise exn)
+end
 
 let tls_upgrade upgrade = Option.map (fun fn flow -> fn (TLS.prj flow)) upgrade
 
