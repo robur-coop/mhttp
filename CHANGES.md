@@ -1,3 +1,7 @@
+### v0.0.5 (2026-10-14)
+
+- Provide websocket as we do on `httpcats` (@dinosaure, #13)
+
 ### v0.0.4 (2026-09-07)
 
 - Fix the limit applied on our TCP/IP connections (@dinosaure, #11)
