@@ -277,7 +277,7 @@ let resolve_location ~uri ~location =
   match String.split_on_char '/' location with
   | "http:" :: "" :: _ -> Ok location
   | "https:" :: "" :: _ -> Ok location
-  | "" :: "" :: _ ->
+  | "" :: "" :: _ | "" :: _ ->
       begin match String.split_on_char '/' uri with
       | schema :: "" :: user_pass_host_port :: _ ->
           Ok (String.concat "/" [ schema; ""; user_pass_host_port ^ location ])
