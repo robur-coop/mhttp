@@ -1,4 +1,4 @@
 (test
-  (name test_resolve_location)
-  (libraries mhttp_client alcotest)
-  (package mhttp-client))
+ (name test_resolve_location)
+ (libraries mhttp_client alcotest)
+ (package mhttp-client))

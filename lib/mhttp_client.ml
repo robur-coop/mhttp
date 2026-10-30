@@ -278,11 +278,11 @@ let resolve_location ~uri ~location =
   | "http:" :: "" :: _ -> Ok location
   | "https:" :: "" :: _ -> Ok location
   | "" :: "" :: authority :: path ->
-    let schema =
-      let idx = String.index uri '/' in
-      String.sub uri 0 idx
-    in
-    Ok (String.concat "/" (schema :: "" :: authority :: path))
+      let schema =
+        let idx = String.index uri '/' in
+        String.sub uri 0 idx
+      in
+      Ok (String.concat "/" (schema :: "" :: authority :: path))
   | "" :: _ ->
       begin match String.split_on_char '/' uri with
       | schema :: "" :: user_pass_host_port :: _ ->
