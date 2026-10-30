@@ -13,6 +13,7 @@ depends: [
   "mnet-happy-eyeballs"
   "mirage-ptime" {>= "5.2.0"}
   "ca-certs-nss" {>= "3.118"}
+  "alcotest" {with-test}
 ]
 build: [
   ["dune" "subst"] {dev}
