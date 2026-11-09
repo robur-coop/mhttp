@@ -1,3 +1,8 @@
+### v0.0.6 (2026-10-14)
+
+- Fix how we handle redirection when the given `Location` is relative to the
+  server (@reynir, #17)
+
 ### v0.0.5 (2026-10-14)
 
 - Provide websocket as we do on `httpcats` (@dinosaure, #13)
